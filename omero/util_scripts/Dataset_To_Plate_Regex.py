@@ -19,10 +19,10 @@
 #
 # ------------------------------------------------------------------------------
 
-
 """
-Adds a Dataset of Images to a new Plate, extracting <row> and <col> from Image names.
-E.g. image_name='WellB01_image.tif', pattern='Well(?P<row>[A-P])(?P<col>[0-9]{2})_image.tif'
+Add Dataset of Images to new Plate, extracting <row> & <col> from Image names.
+E.g. image_name='WellB01_image.tif',
+pattern='Well(?P<row>[A-P])(?P<col>[0-9]{2})_image.tif'
 
 Optionally adds the new Plate to a new or existing Screen.
 
@@ -44,31 +44,41 @@ See http://help.openmicroscopy.org/scripts.html
 # 1. dataset id not found - Pass (message: Dataset not found)
 # 2a. regex invalid / cannot compile - Pass (message: regex error)
 # 2b. regex doesn't match - Pass (message: No match)
-# 2c. invalid row, col matched by regex - Pass (message: rol and col indices not in valid lists)
-# 3a. multiple images per well, e.g. 3 per well - Pass (message: adding n images to well)
-# 3b. multiple images per well, different number per well (1,2,3) - Pass** (adds groups of 3 images)
+# 2c. invalid row, col matched by regex -
+#      Pass (message: rol and col indices not in valid lists)
+# 3a. multiple images per well, e.g. 3 per well -
+#      Pass (message: adding n images to well)
+# 3b. multiple images per well, different number per well (1,2,3) -
+#      Pass** (adds groups of 3 images)
 # 4. name a new screen - Pass
 # 5a. add to existing screen by id (exists) - Pass
-# 5b. add to existing screen by id (doesn't exist) - Pass (Plate created, message: cannot link to Screen)
+# 5b. add to existing screen by id (doesn't exist) -
+#      Pass (Plate created, message: cannot link to Screen)
 # 6a. option to not remove images from dataset - Pass
-# 6b. and then try to add images to a plate again - Pass (refuses unless first Plate deleted)
-# ** Works as expected but not correctly. TODO: extract actual number of Fields per well using regex
+# 6b. and then try to add images to a plate again -
+#      Pass (refuses unless first Plate deleted)
+# ** Works as expected but not correctly.
+#    TODO: extract actual number of Fields per well using regex
 
 import omero.scripts as scripts
 from omero.gateway import BlitzGateway
 import omero
 
-from omero.rtypes import rint, rlong, rstring, robject, unwrap
+from omero.rtypes import rint, rstring, robject
 
-import re, string
+import re
+import string
 
 
 def extract_well_row_col(image_name, row_col_regex):
     """
     Return tuple of ((row, column), message) where:
-    (row, column) is 0-based index tuple from image_name using regex with named <row> and <col> patterns.
-    E.g. image_name='WellB01_image.tif', pattern='Well(?P<row>[A-P])(?P<col>[0-9]{2})_image.tif'
-    N.B. assumes <row> is alphabetical (A-P), <col> is integer (1-24); returns None where pattern not found.
+    (row, column) is 0-based index tuple from image_name using regex
+    with named <row> and <col> patterns.
+    E.g. image_name='WellB01_image.tif',
+      pattern='Well(?P<row>[A-P])(?P<col>[0-9]{2})_image.tif'
+    N.B. assumes <row> is alphabetical (A-P), <col> is integer (1-24)
+    Returns None where pattern not found.
     """
     # row=A-P,col=1-24; i.e. maximum 384 well plate
     row_labels = list(string.ascii_uppercase)[0:16]
@@ -76,7 +86,7 @@ def extract_well_row_col(image_name, row_col_regex):
 
     info = ""
 
-    # try searching for regex pattern and convert to 0-based row,col indices if found
+    # try searching for regex pattern: convert to 0-based row,col indices
     m = row_col_regex.search(image_name)
     if m is None:
         info += "No match!"
@@ -86,7 +96,7 @@ def extract_well_row_col(image_name, row_col_regex):
         try:
             row = mg['row'].upper()
             col = int(mg['col'])
-        except KeyError as e:
+        except KeyError:
             info += "  <row> and/or <col> named matches missing. "
             return None, info
 
@@ -96,23 +106,23 @@ def extract_well_row_col(image_name, row_col_regex):
         except ValueError:
             info += f"  row index not in {row_labels}. "
             row_index = None
-        
+
         try:
             col_index = col_labels.index(col)
             info += f"col={col}({col_index}) "
         except ValueError:
             info += f"column index not in {col_labels}. "
             col_index = None
-        
+
         if (row_index is not None) and (col_index is not None):
             return (row_index, col_index), info
         else:
             return None, info
-            
+
 
 def add_images_to_plate(conn, images, plate_id, column, row, remove_from=None):
     """
-    Add the Images to a Plate, creating a new Well at the specified row and column.
+    Add Images to a Plate, creating a new Well at the specified row and column.
     NB - This will fail if the Well already exists.
     """
     update_service = conn.getUpdateService()
@@ -130,7 +140,7 @@ def add_images_to_plate(conn, images, plate_id, column, row, remove_from=None):
             well.addWellSample(ws)
         update_service.saveObject(well)
     except Exception as e:
-        print(f"Exception! adding Images to Plate Well row,col={row},{col}: {e}")
+        print(f"Exception! adding Images to Well row,col={row},{column}: {e}")
         return False
 
     # remove from Dataset
@@ -143,7 +153,7 @@ def add_images_to_plate(conn, images, plate_id, column, row, remove_from=None):
 
 
 def dataset_to_plate(conn, script_params):
-    """Try to add Dataset Images to Plate using parameters provided.""" 
+    """Try to add Dataset Images to Plate using parameters provided."""
 
     message = ""
 
@@ -171,13 +181,13 @@ def dataset_to_plate(conn, script_params):
     except re.error as e:
         message += f"Error! for Regex '{well_row_col_regex}': {e}"
         return None, message
-    
-    # Get the dataset using ID and abort if Wells already linked or no permission
+
+    # Get dataset using ID and abort if Wells already linked or no permission
     dataset = conn.getObject(dtype, dataset_id)
     if dataset is None:
         message += f"Dataset {dataset_id} not found! "
         return None, message
-    
+
     def has_images_linked_to_well(dataset):
         params = omero.sys.ParametersI()
         query = "select img, well from Well as well "\
@@ -190,7 +200,8 @@ def dataset_to_plate(conn, script_params):
         if len(imgs_wells) > 0:
             for img, well in imgs_wells:
                 image = img.getValue()
-                print(f"Image:{image.id.val} ({image.name.val}) is linked to Well {well.getValue().id.val}")
+                print(f"Image:{image.id.val} ({image.name.val}) is linked " +
+                      "to Well {well.getValue().id.val}")
             return True
 
     if has_images_linked_to_well(dataset):
@@ -201,7 +212,7 @@ def dataset_to_plate(conn, script_params):
         message += f"No permission to add images from dataset {dataset_id}! "
         return None, message
 
-    # find Screen if specified by ID or create new Screen if name string provided
+    # find Screen if specified by ID or create new Screen if Name provided
     newscreen = None
     if screen_id:
         screen = conn.getObject("Screen", screen_id)
@@ -212,8 +223,8 @@ def dataset_to_plate(conn, script_params):
         screen = conn.getObject("Screen", newscreen.getId().getValue())
         screen_id = screen.id
         screen_name = screen.name
-        message += f"Created new Screen '{screen_name}' (id={screen_id}). " 
-        
+        message += f"Created new Screen '{screen_name}' (id={screen_id}). "
+
     # create Plate & link to Screen if specified
     plate = omero.model.PlateI()
     plate.name = omero.rtypes.RStringI(dataset.name)
@@ -231,14 +242,14 @@ def dataset_to_plate(conn, script_params):
             update_service.saveObject(link)
             print(f"Linked Plate to Screen (screen.id={screen_id}). ")
         else:
-            message += f"Could not link Plate to Screen! (screen.id={screen_id}). "
+            message += "Could not link Plate to Screen! "
+            message += f"(screen.id={screen_id}). "
 
     # list Images in Dataset and sort by name
-    # FIXME, this assumes sorting by Image name can be used to group Well images! 
+    # TODO: better way to group Well images than fixed count & sorting by name
     images = list(dataset.listChildren())
-    dataset_img_count = len(images)
     images.sort(key=lambda x: x.name.lower())
-    
+
     # Do we try to remove images from Dataset and Delte Datset when/if empty?
     remove_from = None
     if remove_from_dataset:
@@ -251,10 +262,12 @@ def dataset_to_plate(conn, script_params):
         well_images = images[image_index: image_index + images_per_well]
         if (images_per_well > 1):
             print(f"adding {images_per_well} images to well. ")
-        # FIXME: here we extract row,col indices from first well image only!
+        # TODO: improve on extracting row,col index from first well image only
         # TODO: also extract Well "Field" for each image
-        print(f"extracting row(row_index),col(col_index) for {well_images[0].name}: ")
-        row_col, info = extract_well_row_col(well_images[0].name, regex_compiled)
+        print("extracting row(row_index),col(col_index) " +
+              f"for {well_images[0].name}: ")
+        row_col, info = extract_well_row_col(well_images[0].name,
+                                             regex_compiled)
         print(info)
         if row_col is not None:
             if add_images_to_plate(conn, well_images, plate_id,
@@ -271,7 +284,7 @@ def dataset_to_plate(conn, script_params):
     else:
         robj = None
 
-    return robj, message    
+    return robj, message
 
 
 def run_script():
@@ -285,19 +298,25 @@ def run_script():
     client = scripts.client(
         "Dataset_To_Plate_Regex.py",
         "Take all Images found in a Dataset and add them to a new Plate, " +
-        "extracting Well row and column info from Image names using a python regex (regular expression).\n\n" +
-        "E.g. for Image names such as 'WellB01_image.tif', 'WellC02_image.tif'\n" +
-        "...a matching regex would be: 'Well(?P<row>[A-P])(?P<col>[0-9]{2})_image.tif'\n" +
-        "N.B. named <row> and <col> patterns must be captured by the regex!\n--\n" +
-        "Optionally add the Plate to a new or existing Screen.\nFor help see:\n" +
+        "extracting Well row and column info from Image names using " +
+        "a python regex (regular expression).\n\n" +
+        "E.g. for Image names such as " +
+        "'WellB01_image.tif', 'WellC02_image.tif'\n" +
+        "...a matching regex would be: " +
+        "'Well(?P<row>[A-P])(?P<col>[0-9]{2})_image.tif'\n" +
+        "N.B. named <row> and <col> patterns must be captured by the regex!" +
+        "\n--\n" +
+        "Optionally add the Plate to a new or existing Screen.\n" +
+        "For help see:\n" +
         "- OMERO scripts: http://help.openmicroscopy.org/scripts.html\n" +
-        "- Regular expressions: https://cellprofiler-manual.s3.amazonaws.com/CPmanual/Metadata.html",
+        "- Regular expressions: " +
+        "https://cellprofiler-manual.s3.amazonaws.com/CPmanual/Metadata.html",
 
         scripts.String(
             "Data_Type", optional=False, grouping="1",
             description="Choose source of images (only Dataset supported)",
             values=data_types, default="Dataset"),
-        
+
         scripts.Int(
             "Dataset_ID", optional=False, grouping="2",
             description="Dataset ID to convert to new Plate"
@@ -313,12 +332,12 @@ def run_script():
 
         scripts.String(
             "Screen", grouping="4",
-            description="Option: put Plate in a Screen. Enter ID of existing screen " +
+            description="Option: put Plate in Screen. Enter ID of a screen " +
             "or Name of new Screen"),
 
         scripts.Bool(
             "Remove_From_Dataset", grouping="5", default=True,
-            description="Remove Images from Dataset as they are added to Plate"),
+            description="Remove Images from Dataset as added to Plate"),
 
         version="1.3",
         authors=["Graeme Ball", "William Moore", "OME Team"],
