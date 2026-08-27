@@ -64,7 +64,7 @@ import omero.scripts as scripts
 from omero.gateway import BlitzGateway
 import omero
 
-from omero.rtypes import rint, rstring, robject
+from omero.rtypes import rint, rlong, rstring, robject
 
 import re
 import string
@@ -159,7 +159,7 @@ def dataset_to_plate(conn, script_params):
 
     # get script parameters and update service
     dtype = script_params['Data_Type']
-    dataset_id = script_params['Dataset_ID']
+    dataset_id = script_params['IDs'][0]
     well_row_col_regex = script_params['Well_Row_Col_Regex']
     images_per_well = script_params['Images_Per_Well']
     remove_from_dataset = script_params['Remove_From_Dataset']
@@ -317,10 +317,10 @@ def run_script():
             description="Choose source of images (only Dataset supported)",
             values=data_types, default="Dataset"),
 
-        scripts.Int(
-            "Dataset_ID", optional=False, grouping="2",
-            description="Dataset ID to convert to new Plate"
-            ),
+        scripts.List(
+            "IDs", optional=False, grouping="2",
+            description="Dataset ID to convert to new Plate (first only used)."
+        ).ofType(rlong(0)),
 
         scripts.String(
             "Well_Row_Col_Regex", optional=False, grouping="3.1", default="",
