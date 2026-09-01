@@ -79,7 +79,7 @@ def extract_well_row_col_field(image_name, regex_compiled):
       is 0-based index tuple extracted from image_name and Field can be None
       using regex with named <row>, <col> and (optional) <field> patterns.
     E.g. image_name='WellB01_image.tif',
-      pattern='Well(?P<row>[A-P])(?P<col>[0-1]{1,2})_image.tif'
+      regex='Well(?P<row>[A-P])(?P<col>[0-9]{1,2})_image.tif'
     N.B. assumes <row> is alphabetical (A-P), <col> is integer (1-24);
     Returns (None, info) if pattern does not match or row/col not found.
     """
@@ -328,7 +328,7 @@ def run_script():
         """Take all Images found in a Dataset and add them to a new Plate,
         extracting Well row, column and optionally field info
         from Image names using a python regex (regular expression).
-        E.g. for Images 'WellB1_WT_Pos002.tif', 'WellC02_WT_series001.tif'
+        E.g. for Images 'WellB1_WT_Pos002.tif', 'WellC02_WT_Pos001.tif'
         a matching regex would be:
         'Well(?P<row>[A-P])(?P<col>[0-9]{1,2})_WT_Pos(?P<field>[0-9]{3}).tif'
         N.B. named <row> and <col> patterns must be captured by the regex!
@@ -372,6 +372,7 @@ def run_script():
 
     try:
         script_params = client.getInputs(unwrap=True)
+        print("Params", script_params)
 
         # wrap client to use the Blitz Gateway
         conn = BlitzGateway(client_obj=client)
